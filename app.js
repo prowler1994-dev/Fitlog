@@ -1,11 +1,11 @@
 // ---- Storage helpers ----
-const LS_KEY = 'fitlog_data_v2';
-let db = { workouts: [], weight: [] };
+const LS_KEY = 'fitlog_data_v3';
+let db = { workouts: [], weight: [], cardio: [] };
 
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
 function load(){
   const raw = localStorage.getItem(LS_KEY);
-  if(raw){ try{ db = JSON.parse(raw) }catch(e){ db = {workouts:[],weight:[]} } }
+  if(raw){ try{ db = JSON.parse(raw) }catch(e){ db = {workouts:[],weight:[],cardio:[]} } }
 }
 load();
 
@@ -13,6 +13,7 @@ load();
 function $(sel){ return document.querySelector(sel); }
 function $all(sel){ return Array.from(document.querySelectorAll(sel)); }
 function fmtDate(d){ return new Date(d).toLocaleDateString('pl-PL'); }
+function isoToday(){ return new Date().toISOString().slice(0,10); }
 
 // ---- Tabs ----
 $all('.nav button').forEach(btn=>btn.addEventListener('click',()=>{
@@ -22,6 +23,7 @@ $all('.nav button').forEach(btn=>btn.addEventListener('click',()=>{
   $all('section').forEach(s=>s.style.display='none');
   document.getElementById(tab).style.display='block';
   if(tab==='charts'){ drawWeightChart(); drawStrengthChart(); }
+  if(tab==='cardio'){ renderCardio(); drawCardioWeekly(); }
 }));
 
 // ---- Theme toggle ----
@@ -37,9 +39,9 @@ themeToggle.addEventListener('change', ()=>{
 });
 
 // ---- Defaults ----
-const today = new Date().toISOString().slice(0,10);
-document.getElementById('w_date').value = today;
-document.getElementById('wg_date').value = today;
+$('#w_date').value = isoToday();
+$('#wg_date').value = isoToday();
+$('#c_date').value = isoToday();
 
 // ---- Add workout ----
 document.getElementById('addWorkout').addEventListener('click',()=>{
@@ -60,7 +62,7 @@ function addWorkoutEntry(e){
   $('#w_ex').value=''; $('#w_note').value=''; $('#w_weight').value='';
 }
 
-// ---- Add multiple sets of same exercise ----
+// ---- Add multiple sets ----
 document.getElementById('addMulti').addEventListener('click',()=>{
   const ex = $('#w_ex').value.trim(); if(!ex){ alert('Najpierw wpisz nazwę ćwiczenia.'); return; }
   const n = +$('#w_sets').value || 1;
@@ -84,7 +86,7 @@ function addTemplateA(){
 function addTemplateB(){
   const date = $('#w_date').value;
   const items = [
-    ['Martwy ciąg',5,3,0], ['Wyciskanie stojąc (OHP)',5,5,0], ['Podciąganie',3,8,0], ['Hip thrust',4,8,0]
+    ['Martwy ciąg',5,3,0], ['OHP',5,5,0], ['Podciąganie',3,8,0], ['Hip thrust',4,8,0]
   ];
   items.forEach(([ex,s,r,w])=> addWorkoutEntry({ id: crypto.randomUUID(), date, ex, sets:s, reps:r, weight:w, note:'FBW B' }));
 }
@@ -115,7 +117,6 @@ function renderWorkouts(){
                     <td><button class="btn btn-danger" data-id="${w.id}">Usuń</button></td>`;
     tbody.appendChild(tr);
   }
-  // delete handlers
   tbody.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
     const id = btn.dataset.id;
     db.workouts = db.workouts.filter(w=>w.id!==id); save(); renderWorkouts();
@@ -156,6 +157,73 @@ function renderWeight(){
   }));
 }
 renderWeight();
+
+// ---- Cardio ----
+document.getElementById('addCardio').addEventListener('click', ()=>{
+  const e = {
+    id: crypto.randomUUID(),
+    date: $('#c_date').value,
+    type: $('#c_type').value.trim(),
+    minutes: +$('#c_minutes').value || 0,
+    distance: +$('#c_distance').value || 0,
+    hr: +$('#c_hr').value || 0,
+    note: $('#c_note').value.trim()
+  };
+  if(!e.date || !e.type || !e.minutes){ alert('Podaj datę, rodzaj i czas.'); return; }
+  db.cardio.push(e); save(); renderCardio(); drawCardioWeekly();
+  $('#c_type').value=''; $('#c_note').value=''; $('#c_distance').value=''; $('#c_hr').value='';
+});
+
+$all('[data-cpreset]').forEach(btn=>btn.addEventListener('click', ()=>{
+  const txt = btn.getAttribute('data-cpreset');
+  const [type, minsTxt] = txt.split(' ' + (txt.includes('min')?'':'') );
+}));
+
+$all('[data-cpreset]').forEach(btn=>btn.addEventListener('click', ()=>{
+  const label = btn.dataset.cpreset; // e.g. "Bieżnia 30 min"
+  const m = label.match(/^(.+)\s+(\d+)\s*min/i);
+  if(!m) return;
+  $('#c_type').value = m[1];
+  $('#c_minutes').value = m[2];
+}));
+
+function renderCardio(){
+  const tbody = $('#cardio_table tbody');
+  tbody.innerHTML='';
+  const rows = [...db.cardio].sort((a,b)=>b.date.localeCompare(a.date));
+  for(const r of rows){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${fmtDate(r.date)}</td>
+                    <td>${r.type}</td>
+                    <td>${r.minutes}</td>
+                    <td>${r.distance||''}</td>
+                    <td>${r.hr||''}</td>
+                    <td>${r.note||''}</td>
+                    <td><button class="btn btn-danger" data-id="${r.id}">Usuń</button></td>`;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{
+    const id = btn.dataset.id;
+    db.cardio = db.cardio.filter(x=>x.id!==id); save(); renderCardio(); drawCardioWeekly();
+  }));
+
+  // Weekly summary for current week (Mon-Sun)
+  const now = new Date();
+  const day = (now.getDay() + 6) % 7; // Mon=0
+  const monday = new Date(now); monday.setDate(now.getDate() - day);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  const mins = db.cardio.filter(x=>{
+    const d = new Date(x.date);
+    return d>= new Date(monday.toDateString()) && d <= new Date(sunday.toDateString());
+  }).reduce((acc,x)=>acc + (x.minutes||0), 0);
+  const sessions = db.cardio.filter(x=>{
+    const d = new Date(x.date);
+    return d>= new Date(monday.toDateString()) && d <= new Date(sunday.toDateString());
+  }).length;
+  $('#c_sum_week').textContent = mins;
+  $('#c_sessions_week').textContent = sessions;
+}
+renderCardio();
 
 // ---- Simple charts ----
 function drawLineChart(canvasId, labels, values, options={}){
@@ -233,6 +301,27 @@ function drawStrengthChart(){
 }
 document.getElementById('chart_ex_filter').addEventListener('input', drawStrengthChart);
 
+// ---- Cardio weekly chart ----
+function drawCardioWeekly(){
+  // group by ISO week (YYYY-WW)
+  const byWeek = {};
+  db.cardio.forEach(c=>{
+    const d = new Date(c.date);
+    if(isNaN(d)) return;
+    // ISO week calc
+    const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = (tmp.getUTCDay() || 7);
+    tmp.setUTCDate(tmp.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(tmp.getUTCFullYear(),0,1));
+    const weekNo = Math.ceil((((tmp - yearStart) / 86400000) + 1)/7);
+    const key = tmp.getUTCFullYear() + '-W' + String(weekNo).padStart(2,'0');
+    byWeek[key] = (byWeek[key]||0) + (c.minutes||0);
+  });
+  const labels = Object.keys(byWeek).sort();
+  const vals = labels.map(k=>byWeek[k]);
+  drawLineChart('chart_cardio_weekly', labels, vals, {});
+}
+
 // ---- RM calculator ----
 document.getElementById('calcRM').addEventListener('click',()=>{
   const w = +$('#rm_w').value || 0;
@@ -243,7 +332,7 @@ document.getElementById('calcRM').addEventListener('click',()=>{
   $('#rm_out').innerHTML = `<p><b>Szacowane 1RM</b><br>Epley: ${epley.toFixed(1)} kg<br>Brzycki: ${brzycki.toFixed(1)} kg</p>`;
 });
 
-// ---- Quick presets in Tools tab that add to current fields ----
+// ---- Quick presets ----
 $all('[data-preset]').forEach(btn=>btn.addEventListener('click',()=>{
   const p = btn.dataset.preset;
   const map = { '5x5':[5,5], '3x8':[3,8], '4x8':[4,8], '5x3':[5,3] };
@@ -265,14 +354,14 @@ document.getElementById('exportJSON').addEventListener('click',()=>{
 document.getElementById('exportCSV').addEventListener('click',()=>{
   const rowsW = [['date','exercise','sets','reps','weight','note'], ...db.workouts.map(w=>[w.date,w.ex,w.sets,w.reps,w.weight,w.note||''])];
   const rowsBW = [['date','weight','note'], ...db.weight.map(w=>[w.date,w.value,w.note||''])];
-  const csvW = rowsW.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const csvBW = rowsBW.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const zipParts = {
-    'workouts.csv': csvW,
-    'bodyweight.csv': csvBW
+  const rowsC = [['date','type','minutes','distance','hr','note'], ...db.cardio.map(c=>[c.date,c.type,c.minutes,c.distance||'',c.hr||'',c.note||''])];
+  const makeCsv = (rows)=> rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const files = {
+    'workouts.csv': makeCsv(rowsW),
+    'bodyweight.csv': makeCsv(rowsBW),
+    'cardio.csv': makeCsv(rowsC)
   };
-  // simple multi-file export: create a Blob URL for each and trigger downloads
-  for(const [name,content] of Object.entries(zipParts)){
+  for(const [name,content] of Object.entries(files)){
     const blob = new Blob([content], {type:'text/csv'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href=url; a.download=name; a.click();
@@ -287,9 +376,11 @@ document.getElementById('importBtn').addEventListener('click',()=>{
   reader.onload = () => {
     try{
       const data = JSON.parse(reader.result);
-      if(!data.workouts || !data.weight) throw new Error('Zły format');
+      if(!data.workouts || !data.weight){ throw new Error('Zły format — brakuje workouts/weight'); }
+      if(!data.cardio) data.cardio = [];
       db = data; save();
-      renderWorkouts(); renderWeight(); drawWeightChart(); drawStrengthChart();
+      renderWorkouts(); renderWeight(); renderCardio();
+      drawWeightChart(); drawStrengthChart(); drawCardioWeekly();
       alert('Zaimportowano dane!');
     }catch(e){ alert('Nie udało się zaimportować: ' + e.message); }
   };

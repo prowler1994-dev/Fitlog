@@ -30,6 +30,7 @@ input,select,textarea{width:100%;padding:10px;background:#0f172a;color:#e5eef9;b
 .row{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
 .col-12{grid-column:span 12}
 .col-9{grid-column:span 9}
+.col-8{grid-column:span 8}
 .col-6{grid-column:span 6}
 .col-4{grid-column:span 4}
 .col-3{grid-column:span 3}
@@ -60,6 +61,7 @@ small{color:var(--muted)}
 <div class="container">
   <div class="nav">
     <button class="active" data-tab="workouts">Treningi</button>
+    <button data-tab="cardio">Cardio</button>
     <button data-tab="weight">Waga</button>
     <button data-tab="charts">Wykresy</button>
     <button data-tab="tools">Narzędzia</button>
@@ -69,7 +71,7 @@ small{color:var(--muted)}
 
   <!-- WORKOUTS -->
   <section id="workouts" class="card">
-    <h2>Dodaj trening</h2>
+    <h2>Dodaj trening siłowy</h2>
     <div class="row">
       <div class="col-4">
         <label>Data</label>
@@ -110,7 +112,7 @@ small{color:var(--muted)}
         </div>
         <div class="col-6">
           <button class="btn btn-primary" id="tplB">Wstaw zestaw FBW B (dziś)</button>
-          <small>Martwy ciąg 5x3, Wyciskanie stojąc 5x5, Podciąganie 3x8, Hip thrust 4x8</small>
+          <small>Martwy ciąg 5x3, OHP 5x5, Podciąganie 3x8, Hip thrust 4x8</small>
         </div>
       </div>
     </div>
@@ -133,6 +135,59 @@ small{color:var(--muted)}
     </div>
     <table class="table" id="workouts_table">
       <thead><tr><th>Data</th><th>Ćwiczenie</th><th>Serie x Powt.</th><th>Ciężar</th><th>Notatka</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- CARDIO -->
+  <section id="cardio" class="card" style="display:none">
+    <h2>Cardio – dodaj sesję</h2>
+    <div class="row">
+      <div class="col-4">
+        <label>Data</label><input type="date" id="c_date">
+      </div>
+      <div class="col-4">
+        <label>Rodzaj</label>
+        <input type="text" id="c_type" placeholder="Bieżnia, Rower, Basen, Orbitrek, Marsz...">
+      </div>
+      <div class="col-4">
+        <label>Czas (min)</label><input type="number" id="c_minutes" min="1" value="30">
+      </div>
+      <div class="col-4">
+        <label>Dystans (km) – opcjonalnie</label><input type="number" id="c_distance" step="0.01" min="0">
+      </div>
+      <div class="col-4">
+        <label>Średnie tętno – opcjonalnie</label><input type="number" id="c_hr" min="0">
+      </div>
+      <div class="col-8">
+        <label>Notatka</label><input type="text" id="c_note" placeholder="Strefa 2, interwały, po siłowym itp.">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary" id="addCardio">+ Dodaj cardio</button>
+        <button class="btn" data-cpreset="Bieżnia 30 min">+ Bieżnia 30 min</button>
+        <button class="btn" data-cpreset="Rower 30 min">+ Rower 30 min</button>
+        <button class="btn" data-cpreset="Basen 30 min">+ Basen 30 min</button>
+        <button class="btn" data-cpreset="Marsz 40 min">+ Marsz 40 min</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>Podsumowanie tygodnia</h3>
+      <div class="row">
+        <div class="col-6">
+          <div><b>Minuty cardio (tydzień):</b> <span id="c_sum_week">0</span></div>
+          <div><b>Liczba sesji:</b> <span id="c_sessions_week">0</span></div>
+        </div>
+        <div class="col-6">
+          <label>Wykres minut/tydzień</label>
+          <canvas id="chart_cardio_weekly" height="160"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <h3>Historia cardio</h3>
+    <table class="table" id="cardio_table">
+      <thead><tr><th>Data</th><th>Rodzaj</th><th>Min</th><th>Km</th><th>HR</th><th>Notatka</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
   </section>
@@ -217,7 +272,7 @@ small{color:var(--muted)}
     <h2>Eksport / Import</h2>
     <p><small>Twoje dane są zapisywane lokalnie. Zrób kopię lub przenieś na inne urządzenie.</small></p>
     <button class="btn btn-primary" id="exportJSON">Eksport JSON</button>
-    <button class="btn" id="exportCSV">Eksport CSV (treningi + waga)</button>
+    <button class="btn" id="exportCSV">Eksport CSV (treningi + waga + cardio)</button>
     <input type="file" id="importFile" accept=".json">
     <button class="btn" id="importBtn">Import JSON</button>
   </section>
@@ -225,7 +280,7 @@ small{color:var(--muted)}
   <!-- ABOUT -->
   <section id="about" class="card" style="display:none">
     <h2>O aplikacji</h2>
-    <p>FitLog to prosta aplikacja PWA do logowania treningów siłowych, wagi i śledzenia progresu. Działa offline.</p>
+    <p>FitLog to prosta aplikacja PWA do logowania treningów siłowych, wagi, <b>cardio</b> i śledzenia progresu. Działa offline.</p>
     <p><span class="badge">Instalacja</span> Otwórz w Safari, stuknij <b>Udostępnij</b> → <b>Dodaj do ekranu początkowego</b>.</p>
   </section>
 
